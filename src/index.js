@@ -1,3 +1,4 @@
+// Actualización para Render
 const express = require('express'); // Asegúrate de tener esta línea
 const cors = require('cors');
 const pool = require('./db');
