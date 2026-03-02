@@ -1,42 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const validarToken = require('../middlewares/validarToken');
+require('dotenv').config();
 
-// 1. Configuramos dónde y con qué nombre se guardarán las fotos
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Se guardarán en la carpeta que creaste
-  },
-  filename: function (req, file, cb) {
-    // Le ponemos un nombre único (ej. 167890123-foto.jpg) para que no se sobreescriban
-    const prefijoUnico = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, prefijoUnico + path.extname(file.originalname));
-  }
+// 1. Configuración de Cloudinary (Credenciales)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 2. Filtro de seguridad: Solo aceptar imágenes
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('El archivo no es una imagen válida'), false);
-  }
-};
+// 2. Configurar el almacenamiento en la nube
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'chilacnet_evidencias', // Nombre de la carpeta en Cloudinary
+    allowed_formats: ['jpg', 'png', 'jpeg'],
+    // transformation: [{ width: 800, height: 600, crop: 'limit' }] // Opcional: redimensionar
+  },
+});
 
-const upload = multer({ storage: storage, fileFilter: fileFilter });
+const upload = multer({ storage: storage });
 
-// 3. RUTA POST: Recibe la imagen y devuelve el enlace público
+// 3. RUTA POST: Recibe la imagen y devuelve el enlace de Cloudinary
 router.post('/', validarToken, upload.single('foto'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se subió ninguna imagen' });
     }
     
-    // Generamos el enlace público que guardaremos en la base de datos
-    const imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
-    res.json({ url: imageUrl, mensaje: 'Imagen subida con éxito' });
+    // Cloudinary nos devuelve la URL directa en req.file.path
+    res.json({ 
+        url: req.file.path, 
+        mensaje: 'Imagen guardada en la nube exitosamente' 
+    });
     
   } catch (error) {
     console.error('Error al subir imagen:', error);

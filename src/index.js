@@ -34,6 +34,7 @@ app.get('/api/test', async (req, res) => {
     }
 });
 
+
 // Iniciar el servidor
 app.listen(PORT, () => {
     console.log(`Servidor de Chilacnet corriendo en el puerto ${PORT}`);
