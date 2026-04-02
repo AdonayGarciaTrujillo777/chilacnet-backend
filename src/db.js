@@ -16,7 +16,6 @@ const config = process.env.DATABASE_URL
 
 const pool = new Pool(config);
 
-// ESTO ES EL DIAGNÓSTICO:
 pool.connect()
     .then(() => console.log(" ¡EXITO! CONECTADO A LA BASE DE DATOS"))
     .catch(err => console.error("ERROR FATAL DE CONEXIÓN:", err.message));

@@ -5,12 +5,10 @@ const pool = require('../db');
 const router = express.Router();
 const validarToken = require('../middlewares/validarToken');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto'); // Herramienta nativa de Node para crear códigos seguros
+const crypto = require('crypto'); 
 
-// 1. RUTA PARA REGISTRAR USUARIOS (Protegida: Solo los Administradores pueden usarla)
 router.post('/registrar', validarToken, async (req, res) => {
     try {
-        // REGLA DE SEGURIDAD: Verificar el rol del usuario que hace la petición
         if (req.usuario.rol !== 'administrador') {
             return res.status(403).json({ error: 'Acceso denegado. Solo los administradores pueden registrar personal.' });
         }
@@ -41,31 +39,26 @@ router.post('/registrar', validarToken, async (req, res) => {
     }
 });
 
-// 2. RUTA PARA INICIAR SESIÓN (LOGIN)
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        // Buscar si el usuario existe en la base de datos
         const user = await pool.query('SELECT * FROM usuarios WHERE username = $1', [username]);
         if (user.rows.length === 0) {
             return res.status(401).json({ error: 'Usuario no encontrado o credenciales incorrectas' });
         }
 
-        // Verificar que la contraseña coincida con el hash
         const validPassword = await bcrypt.compare(password, user.rows[0].password_hash);
         if (!validPassword) {
             return res.status(401).json({ error: 'Usuario no encontrado o credenciales incorrectas' });
         }
 
-        // Generar el Token JWT (el "gafete virtual")
         const token = jwt.sign(
             { id: user.rows[0].id, rol: user.rows[0].rol },
             process.env.JWT_SECRET,
-            { expiresIn: '8h' } // El token durará 8 horas de jornada laboral
+            { expiresIn: '8h' } 
         );
 
-        // Enviar respuesta exitosa
         res.json({
             mensaje: 'Inicio de sesión exitoso',
             token: token,
@@ -81,14 +74,12 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Error en el servidor' });
     }
 });
-// GET: Ver lista de todo el personal (Protegido: Solo Administradores)
 router.get('/personal', validarToken, async (req, res) => {
     try {
         if (req.usuario.rol !== 'administrador') {
             return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
         }
         
-        // Seleccionamos los datos, excluyendo la contraseña por seguridad
         const personal = await pool.query(
             'SELECT id, nombre_completo, username, correo, rol, direccion, rfc FROM usuarios ORDER BY rol, nombre_completo'
         );
@@ -99,7 +90,6 @@ router.get('/personal', validarToken, async (req, res) => {
     }
 });
 
-// DELETE: Eliminar un empleado del sistema
 router.delete('/personal/:id', validarToken, async (req, res) => {
     try {
         if (req.usuario.rol !== 'administrador') {
@@ -124,31 +114,24 @@ router.delete('/personal/:id', validarToken, async (req, res) => {
 });
 
 
-// RUTA PARA SOLICITAR RECUPERACIÓN DE CONTRASEÑA
 router.post('/olvide-password', async (req, res) => {
     try {
         const { correo } = req.body;
 
-        // 1. Verificar si el usuario existe
         const user = await pool.query('SELECT * FROM usuarios WHERE correo = $1', [correo]);
         if (user.rows.length === 0) {
-            // Por seguridad, no decimos si el correo existe o no a los hackers, 
-            // pero para el desarrollo podemos mandar un error claro:
             return res.status(404).json({ error: 'No existe un empleado con ese correo electrónico' });
         }
 
-        // 2. Generar un código secreto aleatorio y su caducidad (1 hora)
         const resetToken = crypto.randomBytes(32).toString('hex');
         const expireDate = new Date();
-        expireDate.setHours(expireDate.getHours() + 1); // Caduca en 1 hora exactita
+        expireDate.setHours(expireDate.getHours() + 1); 
 
-        // 3. Guardar el código en la base de datos de ese usuario
         await pool.query(
             'UPDATE usuarios SET reset_token = $1, reset_token_expires = $2 WHERE correo = $3',
             [resetToken, expireDate, correo]
         );
 
-        // 4. Configurar el "Cartero" (Nodemailer) con los datos de Google
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
@@ -157,10 +140,8 @@ router.post('/olvide-password', async (req, res) => {
             }
         });
 
-        // 5. Armar el enlace al que el usuario le dará clic
         const resetUrl = `${process.env.FRONTEND_URL}/restablecer-password/${resetToken}`;
 
-        // 6. Diseñar el correo electrónico
         const mailOptions = {
             from: `"Soporte Chilacnet" <${process.env.EMAIL_USER}>`,
             to: correo,
@@ -181,7 +162,6 @@ router.post('/olvide-password', async (req, res) => {
             `
         };
 
-        // 7. ¡Enviar el correo!
         await transporter.sendMail(mailOptions);
 
         res.json({ mensaje: 'Las instrucciones han sido enviadas a tu correo electrónico.' });
@@ -192,13 +172,11 @@ router.post('/olvide-password', async (req, res) => {
     }
 });
 
-// RUTA PARA GUARDAR LA NUEVA CONTRASEÑA
 router.post('/restablecer-password/:token', async (req, res) => {
     try {
         const { token } = req.params;
         const { nuevaPassword } = req.body;
 
-        // 1. Buscar si el token existe y si aún no ha caducado (1 hora de límite)
         const result = await pool.query(
             'SELECT * FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()',
             [token]
@@ -210,11 +188,9 @@ router.post('/restablecer-password/:token', async (req, res) => {
 
         const usuario = result.rows[0];
 
-        // 2. Encriptar (hashear) la nueva contraseña
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(nuevaPassword, salt);
 
-        // 3. Actualizar la contraseña en la base de datos y borrar el token (para que no se pueda reusar)
         await pool.query(
             'UPDATE usuarios SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2',
             [password_hash, usuario.id]

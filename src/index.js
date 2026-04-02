@@ -2,7 +2,7 @@
 const express = require('express'); // Asegúrate de tener esta línea
 const cors = require('cors');
 const pool = require('./db');
-const path = require('path'); // <-- NUEVO: Necesario para leer la carpeta de fotos
+const path = require('path'); // Necesario para leer la carpeta de fotos
 require('dotenv').config();
 
 const app = express();

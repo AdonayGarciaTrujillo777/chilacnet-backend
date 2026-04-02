@@ -3,10 +3,8 @@ const pool = require('../db');
 const validarToken = require('../middlewares/validarToken');
 const router = express.Router();
 
-// GET: Obtener todos los clientes (Solo pasa si el token es válido)
 router.get('/', validarToken, async (req, res) => {
     try {
-        // Traemos a los clientes ordenados por los más recientes primero
         const clientes = await pool.query('SELECT * FROM clientes ORDER BY fecha_creacion DESC');
         res.json(clientes.rows);
     } catch (error) {
@@ -15,14 +13,12 @@ router.get('/', validarToken, async (req, res) => {
     }
 });
 
-// POST: Registrar un nuevo cliente en el sistema
 router.post('/', validarToken, async (req, res) => {
     try {
         const { nombre_completo, telefono, direccion, paquete_id } = req.body;
 
         const nuevoCliente = await pool.query(
             'INSERT INTO clientes (nombre_completo, telefono, direccion, paquete_id, estado) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            // Por defecto, todo cliente nuevo entra "en espera" de instalación
             [nombre_completo, telefono, direccion, paquete_id, 'en espera'] 
         );
 
@@ -32,7 +28,6 @@ router.post('/', validarToken, async (req, res) => {
         res.status(500).json({ error: 'Error al registrar el cliente en la base de datos' });
     }
 });
-// PUT: Actualizar los datos de un cliente (Sobrescribir información)
 router.put('/:id', validarToken, async (req, res) => {
     try {
         const { id } = req.params;
@@ -66,7 +61,6 @@ router.put('/:id', validarToken, async (req, res) => {
     }
 });
 
-// DELETE: Eliminar un cliente por completo
 router.delete('/:id', validarToken, async (req, res) => {
     try {
         const { id } = req.params;
